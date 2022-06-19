@@ -1,0 +1,42 @@
+#fpga related sources
+VSRCS := \
+	$(BUILD_DIR)/$(long_name).v \
+	$(BUILD_DIR)/$(long_name).behav_srams.v \
+	$(base_dir)/deepreuse/src/main/resources/vsrc/LSHROM.v \
+	$(base_dir)/rocket-chip/src/main/resources/vsrc/AsyncResetReg.v \
+	$(base_dir)/fpga-shells/xilinx/kc705/vsrc/kc705reset.v \
+	$(base_dir)/deepreuse/src/main/resources/vsrc/plusarg_reader.v
+
+
+#simulation sources
+sim_vsrcs = \
+	$(BUILD_DIR)/$(long_name).v \
+	$(BUILD_DIR)/$(long_name).behav_srams.v \
+	$(base_dir)/rocket-chip/src/main/resources/vsrc/SimDTM.v \
+	$(base_dir)/rocket-chip/src/main/resources/vsrc/SimJTAG.v \
+	#$(BUILD_DIR)/$(long_name).rom.v \
+	#$(base_dir)/deepreuse/src/main/resources/vsrc/SimDRAM.v \
+	#$(base_dir)/deepreuse/src/main/resources/vsrc/plusarg_reader.v \
+	#$(base_dir)/deepreuse/src/main/resources/vsrc/SimFPUAdd.v \
+	#$(base_dir)/deepreuse/src/main/resources/vsrc/SimFPUDiv.v \
+	#$(base_dir)/deepreuse/src/main/resources/vsrc/SimFPUMul.v \
+	#$(base_dir)/deepreuse/src/main/resources/vsrc/SimFPUMulAdd.v \
+	#$(base_dir)/deepreuse/src/main/resources/vsrc/SimIntToFloat.v \
+
+#c simulators
+sim_csrcs = \
+	$(base_dir)/rocket-chip/src/main/resources/csrc/SimDTM.cc \
+	$(base_dir)/rocket-chip/src/main/resources/csrc/SimJTAG.cc \
+	$(base_dir)/rocket-chip/src/main/resources/csrc/remote_bitbang.cc \
+	#$(base_dir)/deepreuse/src/main/resources/csrc/SimDRAM.cc \
+	#$(base_dir)/deepreuse/src/main/resources/csrc/mm_dramsim2.cc \
+	#$(base_dir)/deepreuse/src/main/resources/csrc/mm.cc \
+	#$(base_dir)/deepreuse/src/main/resources/csrc/SimFPUAdd.cc \
+	#$(base_dir)/deepreuse/src/main/resources/csrc/SimFPUMul.cc \
+	#$(base_dir)/deepreuse/src/main/resources/csrc/SimFPUDiv.cc \
+	#$(base_dir)/deepreuse/src/main/resources/csrc/SimFPUMulAdd.cc \
+	#$(base_dir)/deepreuse/src/main/resources/csrc/SimIntToFloat.cc \
+	#$(base_dir)/deepreuse/src/main/resources/csrc/IEEEConverter.cc \
+
+CXXFLAGS := $(CXXFLAGS) -O1 -std=c++11 -I$(dramsim_dir) -D__STDC_FORMAT_MACROS -I$(RISCV)/include
+LDFLAGS := $(LDFLAGS) -L$(dramsim_dir) -Wl,-rpath,$(dramsim_dir) -lpthread -L$(RISCV)/lib -Wl,-rpath,$(RISCV)/lib -lfesvr -lpthread

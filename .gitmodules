@@ -1,0 +1,12 @@
+[submodule "rocket-chip"]
+	path = rocket-chip
+	url = https://github.com/chipsalliance/rocket-chip
+[submodule "riscv-isa-sim"]
+	path = riscv-isa-sim
+	url = https://github.com/riscv-software-src/riscv-isa-sim
+[submodule "riscv-tools"]
+	path = riscv-tools
+	url = https://github.com/riscv-software-src/riscv-tools
+[submodule "riscv-gnu-toolchain"]
+	path = riscv-gnu-toolchain
+	url = https://github.com/riscv-collab/riscv-gnu-toolchain
