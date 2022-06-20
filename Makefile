@@ -50,8 +50,13 @@ EXTRA_FIRRTL_ARGS = --infer-rw $(MODEL) --repl-seq-mem -c:$(MODEL):-o:$(BUILD_DI
 # to convert conf file to srams
 VLSI_MEM_GEN ?= $(base_dir)/rocket-chip/scripts/vlsi_mem_gen
 VLSI_ROM_GEN ?= $(base_dir)/rocket-chip/scripts/vlsi_rom_gen
-bin ?= $(base_dir)/sw/bin/cifarnet/int8/LSH_layer0_subvector0.bin
-trace ?=
+
+trace_en ?= 0
+ifeq ($(trace_en),1)
+	trace=--trace
+else
+	trace=
+endif
 
 #rocket JAR file extraction
 scala_srcs := $(shell find $(rocketchip_dir) -name "*.scala" -o -name "*.sbt")
@@ -85,7 +90,7 @@ verilog: $(verilog)
 
 romgen := $(BUILD_DIR)/$(long_name).rom.v
 $(romgen): $(sram)
-	$(VLSI_ROM_GEN) $(BUILD_DIR)/$(long_name).rom.conf $(bin) > $@
+	$(VLSI_ROM_GEN) $(BUILD_DIR)/$(long_name).rom.conf > $@
 
 .PHONY: romgen
 verilog: $(romgen)
@@ -133,7 +138,7 @@ model_dir = $(BUILD_DIR)/$(long_name)
 model_mk = $(model_dir)/V$(MODEL).mk
 model_header = $(model_dir)/V$(MODEL).h
 
-sim_csrcs += $(base_dir)/src/main/resources/csrc/emulator_final.cc
+sim_csrcs += $(base_dir)/src/main/resources/csrc/emulator.cc
 
 $(model_mk): $(sim_vsrcs) $(INSTALLED_VERILATOR)
 	rm -rf $(BUILD_DIR)/$(long_name)

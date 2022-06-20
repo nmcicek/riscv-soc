@@ -6,6 +6,8 @@
 #include <memory>
 #include "verilated_vcd_c.h"
 #endif
+#include <fesvr/dtm.h>
+#include "remote_bitbang.h"
 #include <iostream>
 #include <fcntl.h>
 #include <signal.h>
@@ -29,10 +31,17 @@
 //   variables:
 //     - static const char * verilog_plusargs
 
+extern dtm_t* dtm;
+extern remote_bitbang_t * jtag;
 
 static uint64_t trace_count = 0;
 bool verbose;
 bool done_reset;
+
+void handle_sigterm(int sig)
+{
+  dtm->stop();
+}
 
 double sc_time_stamp()
 {
@@ -77,6 +86,8 @@ EMULATOR DEBUG OPTIONS (only supported in debug build -- try `make debug`)\n",
   -x, --dump-start=CYCLE   Start VCD tracing at CYCLE\n\
        +dump-start\n\
 ", stdout);
+  fputs("\n" PLUSARG_USAGE_OPTIONS, stdout);
+  fputs("\n" HTIF_USAGE_OPTIONS, stdout);
   printf("\n"
 "EXAMPLES\n"
 "  - run a bare metal test:\n"
@@ -99,7 +110,7 @@ EMULATOR DEBUG OPTIONS (only supported in debug build -- try `make debug`)\n",
 int main(int argc, char** argv)
 {
   unsigned random_seed = (unsigned)time(NULL) ^ (unsigned)getpid();
-  uint64_t max_cycles = 30;
+  uint64_t max_cycles = -1;
   int ret = 0;
   bool print_cycles = false;
   // Port numbers are 16 bit unsigned integers. 
@@ -123,6 +134,7 @@ int main(int argc, char** argv)
       {"vcd",         required_argument, 0, 'v' },
       {"dump-start",  required_argument, 0, 'x' },
 #endif
+      HTIF_LONG_OPTIONS
     };
     int option_index = 0;
 #if VM_TRACE
@@ -176,14 +188,48 @@ int main(int argc, char** argv)
           c = 'c';
         // If we don't find a legacy '+' EMULATOR argument, it still could be
         // a VERILOG_PLUSARG and not an error.
+        else if (verilog_plusargs_legal) {
+          const char ** plusarg = &verilog_plusargs[0];
+          int legal_verilog_plusarg = 0;
+          while (*plusarg && (legal_verilog_plusarg == 0)){
+            if (arg.substr(1, strlen(*plusarg)) == *plusarg) {
+              legal_verilog_plusarg = 1;
+            }
+            plusarg ++;
+          }
+          if (!legal_verilog_plusarg) {
+            verilog_plusargs_legal = 0;
+          } else {
+            c = 'P';
+          }
+          goto retry;
+        }
         // If we STILL don't find a legacy '+' argument, it still could be
         // an HTIF (HOST) argument and not an error. If this is the case, then
         // we're done processing EMULATOR and VERILOG arguments.
+        else {
+          static struct option htif_long_options [] = { HTIF_LONG_OPTIONS };
+          struct option * htif_option = &htif_long_options[0];
+          while (htif_option->name) {
+            if (arg.substr(1, strlen(htif_option->name)) == htif_option->name) {
+              optind--;
+              goto done_processing;
+            }
+            htif_option++;
+          }
+          std::cerr << argv[0] << ": invalid plus-arg (Verilog or HTIF) \""
+                    << arg << "\"\n";
+          c = '?';
+        }
         goto retry;
       }
       case 'P': break; // Nothing to do here, Verilog PlusArg
       // Realize that we've hit HTIF (HOST) arguments or error out
       default:
+        if (c >= HTIF_LONG_OPTIONS_OPTIND) {
+          optind--;
+          goto done_processing;
+        }
         c = '?';
         goto retry;
     }
@@ -220,6 +266,10 @@ done_processing:
   }
 #endif
 
+  jtag = new remote_bitbang_t(rbb_port);
+  dtm = new dtm_t(htif_argc, htif_argv);
+
+  signal(SIGTERM, handle_sigterm);
 
   // The initial block in AsyncResetReg is either racy or is not handled
   // correctly by Verilator when the reset signal isn't a top-level pin.
@@ -230,36 +280,14 @@ done_processing:
   // Rocket-chip requires synchronous reset to be asserted for several cycles.
   int sync_reset_cycles = 10;
 
-  // input data stream 
-  int arr[max_cycles]; 
-  int cnt = 0 ;
-  int num;
-  FILE *fptr;
-
-   if ((fptr = fopen("/home/RNNaccelerator/src/main/resources/csrc/testdata.txt","r")) == NULL){
-       printf("Error! opening file");
-
-       // Program exits if the file pointer returns NULL.
-       exit(1);
-   }
-
-  while (fscanf(fptr, "%d", &num) == 1){
-    arr[cnt] = num;
-    cnt = cnt +1;
-  }
-  fclose(fptr); 
-
-
   while (trace_count < max_cycles) {
-    if (false)
+    if (done_reset && (dtm->done() || jtag->done() || tile->io_success))
       break;
 
     tile->clock = 0;
     tile->reset = trace_count < async_reset_cycles*2 ? trace_count % 2 :
       trace_count < async_reset_cycles*2 + sync_reset_cycles;
     done_reset = !tile->reset;
-    tile->io_in1 =  trace_count < async_reset_cycles*2 + sync_reset_cycles ? 0 : 
-      arr[trace_count - (async_reset_cycles*2 + sync_reset_cycles)];
     tile->eval();
 #if VM_TRACE
     bool dump = tfp && trace_count >= start;
@@ -268,8 +296,6 @@ done_processing:
 #endif
 
     tile->clock = trace_count >= async_reset_cycles*2;
-    tile->io_in1 =  trace_count < async_reset_cycles*2 + sync_reset_cycles ? 0 : 
-      arr[trace_count - (async_reset_cycles*2 + sync_reset_cycles)];
     tile->eval();
 #if VM_TRACE
     if (dump)
@@ -285,7 +311,17 @@ done_processing:
     fclose(vcdfile);
 #endif
 
-  if (trace_count == max_cycles)
+  if (dtm->exit_code())
+  {
+    fprintf(stderr, "*** FAILED *** via dtm (code = %d, seed %d) after %ld cycles\n", dtm->exit_code(), random_seed, trace_count);
+    ret = dtm->exit_code();
+  }
+  else if (jtag->exit_code())
+  {
+    fprintf(stderr, "*** FAILED *** via jtag (code = %d, seed %d) after %ld cycles\n", jtag->exit_code(), random_seed, trace_count);
+    ret = jtag->exit_code();
+  }
+  else if (trace_count == max_cycles)
   {
     fprintf(stderr, "*** FAILED *** via trace_count (timeout, seed %d) after %ld cycles\n", random_seed, trace_count);
     ret = 2;
@@ -295,6 +331,8 @@ done_processing:
     fprintf(stderr, "*** PASSED *** Completed after %ld cycles\n", trace_count);
   }
 
+  if (dtm) delete dtm;
+  if (jtag) delete jtag;
   if (tile) delete tile;
   if (htif_argv) free(htif_argv);
   return ret;
