@@ -1,27 +1,20 @@
 RISC-V SOC SETUP
 =============================
 
-## Build GNU Toolchain
+## Clone the repo
 
-### Installation (Newlib)
-
-    cd riscv-gnu-toolchain
-    export RISCV=/path/to/riscv/toolchain
-    ./configure --prefix=$RISCV
-    make
-
-### Installation (Linux)
-    
-    cd riscv-gnu-toolchain
-    export RISCV=/path/to/riscv/toolchain
-    ./configure --prefix=$RISCV
-    make linux
-
-## Build RISC-V Tools
-
+    git clone https://github.com/nmcicek/riscv-soc
     ./init.sh
-    cd riscv-tools
-    ./build.sh
+
+## Install tools
+
+### Build GNU Toolchain
+    
+    ./install_toolchain.sh
+
+### Build RISC-V Tools
+
+    ./build_tools.sh
 
 ## For verilog generation
 
