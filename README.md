@@ -4,7 +4,7 @@ RISC-V SOC SETUP
 ## Clone the repo
 
     git clone https://github.com/nmcicek/riscv-soc
-    ./init.sh
+    ./init_submodules.sh
 
 ## Install tools
 
@@ -15,6 +15,11 @@ RISC-V SOC SETUP
 ### Build RISC-V Tools
 
     ./build_tools.sh
+
+### Alternative Docker Image
+    
+    Use the dockerfile in install_tools directory to build a linux image or pull from dockerhub using the following command:
+    docker pull nmcicek/riscv_soc
 
 ## For verilog generation
 
