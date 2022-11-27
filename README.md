@@ -18,7 +18,7 @@ RISC-V SOC SETUP
 
 ### Alternative Docker Image
     
-    Use the dockerfile in install_tools directory to build a linux image or pull from dockerhub using the following command:
+####    Use the dockerfile in install_tools directory to build a linux image or pull from dockerhub using the following command:
     docker pull nmcicek/riscv_soc
 
 ## For verilog generation
